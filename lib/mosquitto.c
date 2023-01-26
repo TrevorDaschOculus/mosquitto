@@ -113,7 +113,7 @@ struct mosquitto *mosquitto_new(const char *id, bool clean_start, void *userdata
 	if(mosq){
 		mosq->sock = INVALID_SOCKET;
 #ifdef WITH_THREADING
-		mosq->thread_id = pthread_self();
+		mosq->thread_id = mosquitto_thread__self();
 #endif
 		mosq->sockpairR = INVALID_SOCKET;
 		mosq->sockpairW = INVALID_SOCKET;
@@ -205,18 +205,18 @@ int mosquitto_reinitialise(struct mosquitto *mosq, const char *id, bool clean_st
 	mosq->tls_ocsp_required = false;
 #endif
 #ifdef WITH_THREADING
-	pthread_mutex_init(&mosq->callback_mutex, NULL);
-	pthread_mutex_init(&mosq->log_callback_mutex, NULL);
-	pthread_mutex_init(&mosq->state_mutex, NULL);
-	pthread_mutex_init(&mosq->out_packet_mutex, NULL);
-	pthread_mutex_init(&mosq->current_out_packet_mutex, NULL);
-	pthread_mutex_init(&mosq->msgtime_mutex, NULL);
-	pthread_mutex_init(&mosq->msgs_in.mutex, NULL);
-	pthread_mutex_init(&mosq->msgs_out.mutex, NULL);
-	pthread_mutex_init(&mosq->mid_mutex, NULL);
-	mosq->thread_id = pthread_self();
+	mosquitto_mutex__init(&mosq->callback_mutex);
+	mosquitto_mutex__init(&mosq->log_callback_mutex);
+	mosquitto_mutex__init(&mosq->state_mutex);
+	mosquitto_mutex__init(&mosq->out_packet_mutex);
+	mosquitto_mutex__init(&mosq->current_out_packet_mutex);
+	mosquitto_mutex__init(&mosq->msgtime_mutex);
+	mosquitto_mutex__init(&mosq->msgs_in.mutex);
+	mosquitto_mutex__init(&mosq->msgs_out.mutex);
+	mosquitto_mutex__init(&mosq->mid_mutex);
+	mosq->thread_id = mosquitto_thread__self();
 #endif
-	/* This must be after pthread_mutex_init(), otherwise the log mutex may be
+	/* This must be after mosquitto_mutex__init(), otherwise the log mutex may be
 	 * used before being initialised. */
 	if(net__socketpair(&mosq->sockpairR, &mosq->sockpairW)){
 		log__printf(mosq, MOSQ_LOG_WARNING,
@@ -232,10 +232,10 @@ void mosquitto__destroy(struct mosquitto *mosq)
 	if(!mosq) return;
 
 #ifdef WITH_THREADING
-#  ifdef HAVE_PTHREAD_CANCEL
-	if(mosq->threaded == mosq_ts_self && !pthread_equal(mosq->thread_id, pthread_self())){
-		pthread_cancel(mosq->thread_id);
-		pthread_join(mosq->thread_id, NULL);
+#  ifdef HAVE_THREAD_CANCEL
+	if(mosq->threaded == mosq_ts_self && !mosquitto_thread__equal(mosq->thread_id, mosquitto_thread__self())){
+		mosquitto_thread__cancel(mosq->thread_id);
+		mosquitto_thread__join(mosq->thread_id);
 		mosq->threaded = mosq_ts_none;
 	}
 #  endif
@@ -244,15 +244,15 @@ void mosquitto__destroy(struct mosquitto *mosq)
 		/* If mosq->id is not NULL then the client has already been initialised
 		 * and so the mutexes need destroying. If mosq->id is NULL, the mutexes
 		 * haven't been initialised. */
-		pthread_mutex_destroy(&mosq->callback_mutex);
-		pthread_mutex_destroy(&mosq->log_callback_mutex);
-		pthread_mutex_destroy(&mosq->state_mutex);
-		pthread_mutex_destroy(&mosq->out_packet_mutex);
-		pthread_mutex_destroy(&mosq->current_out_packet_mutex);
-		pthread_mutex_destroy(&mosq->msgtime_mutex);
-		pthread_mutex_destroy(&mosq->msgs_in.mutex);
-		pthread_mutex_destroy(&mosq->msgs_out.mutex);
-		pthread_mutex_destroy(&mosq->mid_mutex);
+		mosquitto_mutex__destroy(&mosq->callback_mutex);
+		mosquitto_mutex__destroy(&mosq->log_callback_mutex);
+		mosquitto_mutex__destroy(&mosq->state_mutex);
+		mosquitto_mutex__destroy(&mosq->out_packet_mutex);
+		mosquitto_mutex__destroy(&mosq->current_out_packet_mutex);
+		mosquitto_mutex__destroy(&mosq->msgtime_mutex);
+		mosquitto_mutex__destroy(&mosq->msgs_in.mutex);
+		mosquitto_mutex__destroy(&mosq->msgs_out.mutex);
+		mosquitto_mutex__destroy(&mosq->mid_mutex);
 	}
 #endif
 	if(mosq->sock != INVALID_SOCKET){

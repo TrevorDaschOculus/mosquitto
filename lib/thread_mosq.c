@@ -22,19 +22,13 @@ Contributors:
 #include <time.h>
 #endif
 
-#if defined(WITH_THREADING)
-#if defined(__linux__) || defined(__NetBSD__)
-#  include <pthread.h>
-#elif defined(__FreeBSD__) || defined(__OpenBSD__)
-#  include <pthread_np.h>
-#endif
-#endif
+#include "thread_mosq.h"
 
 #include "mosquitto_internal.h"
 #include "net_mosq.h"
 #include "util_mosq.h"
 
-void *mosquitto__thread_main(void *obj);
+mosquitto_thread_result_t mosquitto__thread_main(void *obj);
 
 int mosquitto_loop_start(struct mosquitto *mosq)
 {
@@ -42,14 +36,8 @@ int mosquitto_loop_start(struct mosquitto *mosq)
 	if(!mosq || mosq->threaded != mosq_ts_none) return MOSQ_ERR_INVAL;
 
 	mosq->threaded = mosq_ts_self;
-	if(!pthread_create(&mosq->thread_id, NULL, mosquitto__thread_main, mosq)){
-#if defined(__linux__)
-		pthread_setname_np(mosq->thread_id, "mosquitto loop");
-#elif defined(__NetBSD__)
-		pthread_setname_np(mosq->thread_id, "%s", "mosquitto loop");
-#elif defined(__FreeBSD__) || defined(__OpenBSD__)
-		pthread_set_name_np(mosq->thread_id, "mosquitto loop");
-#endif
+	if(!mosquitto_thread__create(&mosq->thread_id, mosquitto__thread_main, mosq)){
+		mosquitto_thread__set_name(mosq->thread_id, "mosquitto loop");
 		return MOSQ_ERR_SUCCESS;
 	}else{
 		return MOSQ_ERR_ERRNO;
@@ -81,13 +69,11 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 #endif
 	}
 
-#ifdef HAVE_PTHREAD_CANCEL
 	if(force){
-		pthread_cancel(mosq->thread_id);
+		mosquitto_thread__cancel(mosq->thread_id);
 	}
-#endif
-	pthread_join(mosq->thread_id, NULL);
-	mosq->thread_id = pthread_self();
+	mosquitto_thread__join(mosq->thread_id);
+	mosq->thread_id = mosquitto_thread__self();
 	mosq->threaded = mosq_ts_none;
 
 	return MOSQ_ERR_SUCCESS;
@@ -99,7 +85,7 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 }
 
 #ifdef WITH_THREADING
-void *mosquitto__thread_main(void *obj)
+mosquitto_thread_result_t mosquitto__thread_main(void *obj)
 {
 	struct mosquitto *mosq = obj;
 #ifndef WIN32
@@ -108,7 +94,7 @@ void *mosquitto__thread_main(void *obj)
 	ts.tv_nsec = 10000000;
 #endif
 
-	if(!mosq) return NULL;
+	if(!mosq) return get_mosquitto_thread_result(NULL);
 
 	do{
 		if(mosquitto__get_state(mosq) == mosq_cs_new){
@@ -133,7 +119,7 @@ void *mosquitto__thread_main(void *obj)
 		mosq->threaded = mosq_ts_none;
 	}
 
-	return obj;
+	return get_mosquitto_thread_result(obj);
 }
 #endif
 

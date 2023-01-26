@@ -29,6 +29,7 @@ Contributors:
 #include "net_mosq.h"
 #include "packet_mosq.h"
 #include "socks_mosq.h"
+#include "thread_mosq.h"
 #include "tls_mosq.h"
 #include "util_mosq.h"
 
@@ -63,8 +64,8 @@ int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 	if(mosq->sock != INVALID_SOCKET){
 		maxfd = mosq->sock;
 		FD_SET(mosq->sock, &readfds);
-		pthread_mutex_lock(&mosq->current_out_packet_mutex);
-		pthread_mutex_lock(&mosq->out_packet_mutex);
+		mosquitto_mutex__lock(&mosq->current_out_packet_mutex);
+		mosquitto_mutex__lock(&mosq->out_packet_mutex);
 		if(mosq->out_packet || mosq->current_out_packet){
 			FD_SET(mosq->sock, &writefds);
 		}
@@ -75,8 +76,8 @@ int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 			}
 		}
 #endif
-		pthread_mutex_unlock(&mosq->out_packet_mutex);
-		pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+		mosquitto_mutex__unlock(&mosq->out_packet_mutex);
+		mosquitto_mutex__unlock(&mosq->current_out_packet_mutex);
 	}else{
 #ifdef WITH_SRV
 		if(mosq->achan){
@@ -108,11 +109,11 @@ int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 	}
 
 	now = mosquitto_time();
-	pthread_mutex_lock(&mosq->msgtime_mutex);
+	mosquitto_mutex__lock(&mosq->msgtime_mutex);
 	if(mosq->next_msg_out && now + timeout_ms/1000 > mosq->next_msg_out){
 		timeout_ms = (mosq->next_msg_out - now)*1000;
 	}
-	pthread_mutex_unlock(&mosq->msgtime_mutex);
+	mosquitto_mutex__unlock(&mosq->msgtime_mutex);
 
 	if(timeout_ms < 0){
 		/* There has been a delay somewhere which means we should have already
@@ -249,9 +250,7 @@ int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
 
 	while(run){
 		do{
-#ifdef HAVE_PTHREAD_CANCEL
-			pthread_testcancel();
-#endif
+			mosquitto_thread__testcancel();
 			rc = mosquitto_loop(mosq, timeout, max_packets);
 		}while(run && rc == MOSQ_ERR_SUCCESS);
 		/* Quit after fatal errors. */
@@ -276,9 +275,7 @@ int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
 			return rc;
 		}
 		do{
-#ifdef HAVE_PTHREAD_CANCEL
-			pthread_testcancel();
-#endif
+			mosquitto_thread__testcancel();
 			rc = MOSQ_ERR_SUCCESS;
 			if(mosquitto__get_request_disconnect(mosq)){
 				run = 0;
@@ -333,7 +330,7 @@ static int mosquitto__loop_rc_handle(struct mosquitto *mosq, int rc)
 		if(state == mosq_cs_disconnecting || state == mosq_cs_disconnected){
 			rc = MOSQ_ERR_SUCCESS;
 		}
-		pthread_mutex_lock(&mosq->callback_mutex);
+		mosquitto_mutex__lock(&mosq->callback_mutex);
 		if(mosq->on_disconnect){
 			mosq->in_callback = true;
 			mosq->on_disconnect(mosq, mosq->userdata, rc);
@@ -344,7 +341,7 @@ static int mosquitto__loop_rc_handle(struct mosquitto *mosq, int rc)
 			mosq->on_disconnect_v5(mosq, mosq->userdata, rc, NULL);
 			mosq->in_callback = false;
 		}
-		pthread_mutex_unlock(&mosq->callback_mutex);
+		mosquitto_mutex__unlock(&mosq->callback_mutex);
 	}
 	return rc;
 }
@@ -356,13 +353,13 @@ int mosquitto_loop_read(struct mosquitto *mosq, int max_packets)
 	int i;
 	if(max_packets < 1) return MOSQ_ERR_INVAL;
 
-	pthread_mutex_lock(&mosq->msgs_out.mutex);
+	mosquitto_mutex__lock(&mosq->msgs_out.mutex);
 	max_packets = mosq->msgs_out.queue_len;
-	pthread_mutex_unlock(&mosq->msgs_out.mutex);
+	mosquitto_mutex__unlock(&mosq->msgs_out.mutex);
 
-	pthread_mutex_lock(&mosq->msgs_in.mutex);
+	mosquitto_mutex__lock(&mosq->msgs_in.mutex);
 	max_packets += mosq->msgs_in.queue_len;
-	pthread_mutex_unlock(&mosq->msgs_in.mutex);
+	mosquitto_mutex__unlock(&mosq->msgs_in.mutex);
 
 	if(max_packets < 1) max_packets = 1;
 	/* Queue len here tells us how many messages are awaiting processing and
