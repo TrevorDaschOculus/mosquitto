@@ -11,12 +11,12 @@
 #    define get_mosquitto_thread_result(arg) (arg != NULL)
 
 #    define mosquitto_thread__create(thread, start_routine, arg) (!thread || !(*thread = CreateThread(NULL, 0, start_routine, arg, 0, NULL)))
-#    define mosquitto_thread__join(thread) WaitForSingleObject(thread, INFINITE)
+#    define mosquitto_thread__join(thread) WaitForSingleObject(thread, GetThreadId(thread) == GetCurrentThreadId() ? 0 : INFINITE)
 #    define mosquitto_thread__cancel(thread)
 #    define mosquitto_thread__testcancel()
 
 #    define mosquitto_thread__self() GetCurrentThread()
-#    define mosquitto_thread__equal(a, b) CompareObjectHandles(a, b)
+#    define mosquitto_thread__equal(a, b) GetThreadId(a) == GetThreadId(b)
 
 #    define mosquitto_thread__set_name(thread, name) SetThreadDescription(thread, L##name);
 
