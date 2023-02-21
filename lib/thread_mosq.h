@@ -35,7 +35,7 @@
 #    define mosquitto_mutex_t pthread_mutex_t
 #    define mosquitto_thread_t pthread_t
 #    define mosquitto_thread_result_t void*
-#    define mosquitto_thread_decl __cdecl
+#    define mosquitto_thread_decl
 #    define get_mosquitto_thread_result(arg) arg
 
 #    define mosquitto_thread__create(thread, start_routine, arg) pthread_create(thread, NULL, start_routine, arg)
