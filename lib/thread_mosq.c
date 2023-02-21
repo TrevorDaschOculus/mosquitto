@@ -28,7 +28,7 @@ Contributors:
 #include "net_mosq.h"
 #include "util_mosq.h"
 
-mosquitto_thread_result_t mosquitto__thread_main(void *obj);
+mosquitto_thread_result_t mosquitto_thread_decl mosquitto__thread_main(void *obj);
 
 int mosquitto_loop_start(struct mosquitto *mosq)
 {
@@ -85,7 +85,7 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 }
 
 #ifdef WITH_THREADING
-mosquitto_thread_result_t mosquitto__thread_main(void *obj)
+mosquitto_thread_result_t mosquitto_thread_decl mosquitto__thread_main(void *obj)
 {
 	struct mosquitto *mosq = obj;
 #ifndef WIN32

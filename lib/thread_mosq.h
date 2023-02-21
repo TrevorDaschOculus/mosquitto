@@ -8,6 +8,7 @@
 #    define mosquitto_mutex_t CRITICAL_SECTION
 #    define mosquitto_thread_t HANDLE
 #    define mosquitto_thread_result_t DWORD
+#    define mosquitto_thread_decl __stdcall
 #    define get_mosquitto_thread_result(arg) (arg != NULL)
 
 #    define mosquitto_thread__create(thread, start_routine, arg) (!thread || !(*thread = CreateThread(NULL, 0, start_routine, arg, 0, NULL)))
@@ -34,6 +35,7 @@
 #    define mosquitto_mutex_t pthread_mutex_t
 #    define mosquitto_thread_t pthread_t
 #    define mosquitto_thread_result_t void*
+#    define mosquitto_thread_decl __cdecl
 #    define get_mosquitto_thread_result(arg) arg
 
 #    define mosquitto_thread__create(thread, start_routine, arg) pthread_create(thread, NULL, start_routine, arg)
